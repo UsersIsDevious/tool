@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Image Crop</title>
+  <style>
+    #originalImage {
+      max-width: 100%;
+      height: auto;
+    }
+    #croppedImage {
+      border: 1px solid black;
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <h1>画像切り抜きツール</h1>
+
+  <div>
+    <label for="imageInput">画像を選択:</label>
+    <input type="file" id="imageInput" accept="image/*">
+  </div>
+
+  <div>
+    <label for="centerX">中心X:</label>
+    <input type="number" id="centerX" placeholder="X座標">
+  </div>
+
+  <div>
+    <label for="centerY">中心Y:</label>
+    <input type="number" id="centerY" placeholder="Y座標">
+  </div>
+
+  <div>
+    <label for="radius">半径:</label>
+    <input type="number" id="radius" placeholder="半径">
+  </div>
+
+  <button id="cropButton">切り抜く</button>
+
+  <h2>オリジナル画像</h2>
+  <img id="originalImage" src="" alt="選択された画像">
+
+  <h2>切り抜き後の画像</h2>
+  <canvas id="croppedCanvas"></canvas>
+
+  <script>
+    const imageInput = document.getElementById('imageInput');
+    const originalImage = document.getElementById('originalImage');
+    const cropButton = document.getElementById('cropButton');
+    const croppedCanvas = document.getElementById('croppedCanvas');
+    const centerXInput = document.getElementById('centerX');
+    const centerYInput = document.getElementById('centerY');
+    const radiusInput = document.getElementById('radius');
+
+    let image = new Image();
+
+    imageInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        image.src = event.target.result;
+        originalImage.src = image.src;
+      };
+      reader.readAsDataURL(file);
+    });
+
+    cropButton.addEventListener('click', () => {
+      const centerX = parseInt(centerXInput.value);
+      const centerY = parseInt(centerYInput.value);
+      const radius = parseInt(radiusInput.value);
+
+      const ctx = croppedCanvas.getContext('2d');
+      croppedCanvas.width = radius * 2;
+      croppedCanvas.height = radius * 2;
+
+      ctx.clearRect(0, 0, croppedCanvas.width, croppedCanvas.height);
+      ctx.drawImage(
+        image,
+        centerX - radius, // 切り抜き開始X
+        centerY - radius, // 切り抜き開始Y
+        radius * 2, // 幅
+        radius * 2, // 高さ
+        0,
+        0,
+        radius * 2,
+        radius * 2
+      );
+    });
+  </script>
+</body>
+</html>
