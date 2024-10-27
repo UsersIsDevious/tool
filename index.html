@@ -1,164 +1,94 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ja">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>JSON Filter Web App</title>
-  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.0.1/dist/tailwind.min.css" rel="stylesheet">
+  <title>Image Crop</title>
+  <style>
+    #originalImage {
+      max-width: 100%;
+      height: auto;
+    }
+    #croppedImage {
+      border: 1px solid black;
+      display: block;
+    }
+  </style>
 </head>
-<body class="bg-gray-100">
-  <div class="container mx-auto p-4">
-    <h1 class="text-2xl font-bold mb-4">JSON Filter Web App</h1>
-    <textarea id="jsonInput" class="w-full h-32 p-2 mb-4 border rounded" placeholder="Paste your JSON here"></textarea>
+<body>
+  <h1>画像切り抜きツール</h1>
 
-    <div id="filterContainer" class="flex flex-wrap mb-4">
-      <div class="filter-group flex mb-2 w-full">
-        <select class="filterKey flex-1 p-2 border rounded mr-2"></select>
-        <input type="text" class="filterValue flex-1 p-2 border rounded mr-2" placeholder="Enter value to filter">
-        <button class="remove-filter-btn p-2 bg-red-500 text-white rounded">Remove</button>
-      </div>
-    </div>
-
-    <button id="addFilterBtn" class="p-2 mb-4 bg-green-500 text-white rounded">Add Filter</button>
-    <button id="filterBtn" class="p-2 mb-4 bg-blue-500 text-white rounded">Filter</button>
-
-    <div id="output" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-      <!-- Cards will be displayed here -->
-    </div>
+  <div>
+    <label for="imageInput">画像を選択:</label>
+    <input type="file" id="imageInput" accept="image/*">
   </div>
 
-  <script>document.getElementById('jsonInput').addEventListener('input', function() {
-    const jsonInput = document.getElementById('jsonInput').value;
-    updateFilterKeys(jsonInput);
-  });
-  
-  document.getElementById('addFilterBtn').addEventListener('click', function() {
-    addFilter();
-  });
-  
-  document.getElementById('filterBtn').addEventListener('click', function() {
-    const jsonInput = document.getElementById('jsonInput').value;
-    filterData(jsonInput);
-  });
-  
-  // フィルタのキーを動的に更新する
-  function updateFilterKeys(jsonInput) {
-    try {
-      const jsonData = JSON.parse(jsonInput);
-      const keys = new Set(); // 重複を避けるため Set を使用
-      jsonData.forEach(item => {
-        extractKeys(item, '', keys);
-      });
-  
-      const filterGroups = document.querySelectorAll('.filter-group');
-      
-      filterGroups.forEach(group => {
-        const filterKeyDropdown = group.querySelector('.filterKey');
-        filterKeyDropdown.innerHTML = '';
-        keys.forEach(key => {
-          const option = document.createElement('option');
-          option.value = key;
-          option.textContent = key;
-          filterKeyDropdown.appendChild(option);
-        });
-      });
-    } catch (error) {
-      // Do nothing if JSON is invalid
-    }
-  }
-  
-  // 再帰的に全てのキーを取得
-  function extractKeys(obj, parentKey, keySet) {
-    for (let key in obj) {
-      const fullKey = parentKey ? `${parentKey}.${key}` : key;
-      keySet.add(fullKey);
-      if (typeof obj[key] === 'object' && obj[key] !== null) {
-        extractKeys(obj[key], fullKey, keySet); // 再帰的にキーを探索
-      }
-    }
-  }
-  
-  // フィルタを追加
-  function addFilter() {
-    const filterContainer = document.getElementById('filterContainer');
-    const filterGroup = document.createElement('div');
-    filterGroup.className = 'filter-group flex mb-2 w-full';
-    
-    filterGroup.innerHTML = `
-      <select class="filterKey flex-1 p-2 border rounded mr-2"></select>
-      <input type="text" class="filterValue flex-1 p-2 border rounded mr-2" placeholder="Enter value to filter">
-      <button class="remove-filter-btn p-2 bg-red-500 text-white rounded">Remove</button>
-    `;
-  
-    filterContainer.appendChild(filterGroup);
-    updateFilterKeys(document.getElementById('jsonInput').value);
-  
-    // フィルタ削除ボタン
-    filterGroup.querySelector('.remove-filter-btn').addEventListener('click', function() {
-      filterGroup.remove();
+  <div>
+    <label for="centerX">中心X:</label>
+    <input type="number" id="centerX" placeholder="X座標">
+  </div>
+
+  <div>
+    <label for="centerY">中心Y:</label>
+    <input type="number" id="centerY" placeholder="Y座標">
+  </div>
+
+  <div>
+    <label for="radius">半径:</label>
+    <input type="number" id="radius" placeholder="半径">
+  </div>
+
+  <button id="cropButton">切り抜く</button>
+
+  <h2>オリジナル画像</h2>
+  <img id="originalImage" src="" alt="選択された画像">
+
+  <h2>切り抜き後の画像</h2>
+  <canvas id="croppedCanvas"></canvas>
+
+  <script>
+    const imageInput = document.getElementById('imageInput');
+    const originalImage = document.getElementById('originalImage');
+    const cropButton = document.getElementById('cropButton');
+    const croppedCanvas = document.getElementById('croppedCanvas');
+    const centerXInput = document.getElementById('centerX');
+    const centerYInput = document.getElementById('centerY');
+    const radiusInput = document.getElementById('radius');
+
+    let image = new Image();
+
+    imageInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      const reader = new FileReader();
+      reader.onload = function(event) {
+        image.src = event.target.result;
+        originalImage.src = image.src;
+      };
+      reader.readAsDataURL(file);
     });
-  }
-  
-  // 再帰的にキーの値を取得する関数
-  function getValueByKey(obj, keyPath) {
-    const keys = keyPath.split('.');
-    let current = obj;
-    
-    for (let key of keys) {
-      if (current[key] === undefined) {
-        return undefined;
-      }
-      current = current[key];
-    }
-    return current;
-  }
-  
-  // 複数条件でフィルタリング
-  function filterData(jsonInput) {
-    const filterGroups = document.querySelectorAll('.filter-group');
-    const filters = Array.from(filterGroups).map(group => ({
-      key: group.querySelector('.filterKey').value,
-      value: group.querySelector('.filterValue').value
-    }));
-    
-    const output = document.getElementById('output');
-    output.innerHTML = ''; // Clear previous results
-  
-    try {
-      const jsonData = JSON.parse(jsonInput);
-  
-      jsonData.forEach(item => {
-        let matchesAllFilters = true;
-  
-        filters.forEach(filter => {
-          const value = getValueByKey(item, filter.key);
-          if (value === undefined || value.toString() !== filter.value) {
-            matchesAllFilters = false;
-          }
-        });
-  
-        if (matchesAllFilters) {
-          const card = document.createElement('div');
-          card.className = 'bg-white p-4 shadow rounded relative';
-          card.innerHTML = `
-            <h2 class="text-xl font-bold mb-2">Item</h2>
-            <pre class="text-sm">${JSON.stringify(item, null, 2)}</pre>
-            <button class="copy-btn absolute top-2 right-2 p-1 bg-gray-200 text-gray-800 rounded">Copy</button>
-          `;
-          
-          // コピー機能
-          card.querySelector('.copy-btn').addEventListener('click', function() {
-            navigator.clipboard.writeText(JSON.stringify(item, null, 2));
-            alert('Copied to clipboard');
-          });
-  
-          output.appendChild(card);
-        }
-      });
-    } catch (error) {
-      alert('Invalid JSON input');
-    }
-  }
-    </script>
+
+    cropButton.addEventListener('click', () => {
+      const centerX = parseInt(centerXInput.value);
+      const centerY = parseInt(centerYInput.value);
+      const radius = parseInt(radiusInput.value);
+
+      const ctx = croppedCanvas.getContext('2d');
+      croppedCanvas.width = radius * 2;
+      croppedCanvas.height = radius * 2;
+
+      ctx.clearRect(0, 0, croppedCanvas.width, croppedCanvas.height);
+      ctx.drawImage(
+        image,
+        centerX - radius, // 切り抜き開始X
+        centerY - radius, // 切り抜き開始Y
+        radius * 2, // 幅
+        radius * 2, // 高さ
+        0,
+        0,
+        radius * 2,
+        radius * 2
+      );
+    });
+  </script>
 </body>
 </html>
