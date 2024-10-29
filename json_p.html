@@ -10,151 +10,237 @@
   <div class="container mx-auto p-4">
     <h1 class="text-2xl font-bold mb-4">JSON Filter Web App</h1>
     <textarea id="jsonInput" class="w-full h-32 p-2 mb-4 border rounded" placeholder="Paste your JSON here"></textarea>
+
     <div id="filterContainer" class="flex flex-wrap mb-4">
       <div class="filter-group flex mb-2 w-full">
         <select class="filterKey flex-1 p-2 border rounded mr-2"></select>
         <input type="text" class="filterValue flex-1 p-2 border rounded mr-2" placeholder="Enter value to filter">
+        <select class="searchMode flex-1 p-2 border rounded mr-2">
+          <option value="exact">完全一致</option>
+          <option value="contains">部分一致</option>
+          <option value="startsWith">前方一致</option>
+          <option value="endsWith">後方一致</option>
+          <option value="caseInsensitive">大文字小文字無視</option>
+          <option value="range">数値範囲</option>
+          <option value="regex">正規表現</option>
+        </select>
         <button class="remove-filter-btn p-2 bg-red-500 text-white rounded">Remove</button>
       </div>
     </div>
+
     <button id="addFilterBtn" class="p-2 mb-4 bg-green-500 text-white rounded">Add Filter</button>
     <button id="filterBtn" class="p-2 mb-4 bg-blue-500 text-white rounded">Filter</button>
+    <button id="downloadJsonBtn" class="p-2 mb-4 bg-yellow-500 text-white rounded hidden">Download JSON</button>
+
     <div id="output" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
       <!-- Cards will be displayed here -->
     </div>
   </div>
-  <script>document.getElementById('jsonInput').addEventListener('input', function() {
-    const jsonInput = document.getElementById('jsonInput').value;
-    updateFilterKeys(jsonInput);
-  });
-  
-  document.getElementById('addFilterBtn').addEventListener('click', function() {
-    addFilter();
-  });
-  
-  document.getElementById('filterBtn').addEventListener('click', function() {
-    const jsonInput = document.getElementById('jsonInput').value;
-    filterData(jsonInput);
-  });
-  
-  // フィルタのキーを動的に更新する
-  function updateFilterKeys(jsonInput) {
-    try {
-      const jsonData = JSON.parse(jsonInput);
-      const keys = new Set(); // 重複を避けるため Set を使用
-      jsonData.forEach(item => {
-        extractKeys(item, '', keys);
-      });
-  
-      const filterGroups = document.querySelectorAll('.filter-group');
-      
-      filterGroups.forEach(group => {
-        const filterKeyDropdown = group.querySelector('.filterKey');
-        filterKeyDropdown.innerHTML = '';
-        keys.forEach(key => {
-          const option = document.createElement('option');
-          option.value = key;
-          option.textContent = key;
-          filterKeyDropdown.appendChild(option);
-        });
-      });
-    } catch (error) {
-      // Do nothing if JSON is invalid
-    }
-  }
-  
-  // 再帰的に全てのキーを取得
-  function extractKeys(obj, parentKey, keySet) {
-    for (let key in obj) {
-      const fullKey = parentKey ? `${parentKey}.${key}` : key;
-      keySet.add(fullKey);
-      if (typeof obj[key] === 'object' && obj[key] !== null) {
-        extractKeys(obj[key], fullKey, keySet); // 再帰的にキーを探索
-      }
-    }
-  }
-  
-  // フィルタを追加
-  function addFilter() {
-    const filterContainer = document.getElementById('filterContainer');
-    const filterGroup = document.createElement('div');
-    filterGroup.className = 'filter-group flex mb-2 w-full';
-    
-    filterGroup.innerHTML = `
-      <select class="filterKey flex-1 p-2 border rounded mr-2"></select>
-      <input type="text" class="filterValue flex-1 p-2 border rounded mr-2" placeholder="Enter value to filter">
-      <button class="remove-filter-btn p-2 bg-red-500 text-white rounded">Remove</button>
-    `;
-  
-    filterContainer.appendChild(filterGroup);
-    updateFilterKeys(document.getElementById('jsonInput').value);
-  
-    // フィルタ削除ボタン
-    filterGroup.querySelector('.remove-filter-btn').addEventListener('click', function() {
-      filterGroup.remove();
+
+  <script>
+    let filteredResults = []; // フィルタリング結果を保存する配列
+
+document.getElementById('jsonInput').addEventListener('input', function() {
+  const jsonInput = document.getElementById('jsonInput').value;
+  updateFilterKeys(jsonInput);
+});
+
+document.getElementById('addFilterBtn').addEventListener('click', function() {
+  addFilter();
+});
+
+document.getElementById('filterBtn').addEventListener('click', function() {
+  const jsonInput = document.getElementById('jsonInput').value;
+  filterData(jsonInput);
+});
+
+document.getElementById('downloadJsonBtn').addEventListener('click', function() {
+  downloadJSON();
+});
+
+// フィルタのキーを動的に更新する
+function updateFilterKeys(jsonInput) {
+  try {
+    const jsonData = JSON.parse(jsonInput);
+    const keys = new Set(); // 重複を避けるため Set を使用
+    jsonData.forEach(item => {
+      extractKeys(item, '', keys);
     });
-  }
-  
-  // 再帰的にキーの値を取得する関数
-  function getValueByKey(obj, keyPath) {
-    const keys = keyPath.split('.');
-    let current = obj;
-    
-    for (let key of keys) {
-      if (current[key] === undefined) {
-        return undefined;
-      }
-      current = current[key];
-    }
-    return current;
-  }
-  
-  // 複数条件でフィルタリング
-  function filterData(jsonInput) {
+
     const filterGroups = document.querySelectorAll('.filter-group');
-    const filters = Array.from(filterGroups).map(group => ({
-      key: group.querySelector('.filterKey').value,
-      value: group.querySelector('.filterValue').value
-    }));
     
-    const output = document.getElementById('output');
-    output.innerHTML = ''; // Clear previous results
+    filterGroups.forEach(group => {
+      const filterKeyDropdown = group.querySelector('.filterKey');
+      filterKeyDropdown.innerHTML = '';
+      keys.forEach(key => {
+        const option = document.createElement('option');
+        option.value = key;
+        option.textContent = key;
+        filterKeyDropdown.appendChild(option);
+      });
+    });
+  } catch (error) {
+    // Do nothing if JSON is invalid
+  }
+}
+
+// 再帰的に全てのキーを取得
+function extractKeys(obj, parentKey, keySet) {
+  for (let key in obj) {
+    const fullKey = parentKey ? `${parentKey}.${key}` : key;
+    keySet.add(fullKey);
+    if (typeof obj[key] === 'object' && obj[key] !== null) {
+      extractKeys(obj[key], fullKey, keySet); // 再帰的にキーを探索
+    }
+  }
+}
+
+// フィルタを追加
+function addFilter() {
+  const filterContainer = document.getElementById('filterContainer');
+  const filterGroup = document.createElement('div');
+  filterGroup.className = 'filter-group flex mb-2 w-full';
   
-    try {
-      const jsonData = JSON.parse(jsonInput);
+  filterGroup.innerHTML = `
+    <select class="filterKey flex-1 p-2 border rounded mr-2"></select>
+    <input type="text" class="filterValue flex-1 p-2 border rounded mr-2" placeholder="Enter value to filter">
+    <select class="searchMode flex-1 p-2 border rounded mr-2">
+      <option value="exact">完全一致</option>
+      <option value="contains">部分一致</option>
+      <option value="startsWith">前方一致</option>
+      <option value="endsWith">後方一致</option>
+      <option value="caseInsensitive">大文字小文字無視</option>
+      <option value="range">数値範囲</option>
+      <option value="regex">正規表現</option>
+    </select>
+    <button class="remove-filter-btn p-2 bg-red-500 text-white rounded">Remove</button>
+  `;
+
+  filterContainer.appendChild(filterGroup);
+  updateFilterKeys(document.getElementById('jsonInput').value);
+
+  // フィルタ削除ボタン
+  filterGroup.querySelector('.remove-filter-btn').addEventListener('click', function() {
+    filterGroup.remove();
+  });
+}
+
+// 再帰的にキーの値を取得する関数
+function getValueByKey(obj, keyPath) {
+  const keys = keyPath.split('.');
+  let current = obj;
   
-      jsonData.forEach(item => {
-        let matchesAllFilters = true;
+  for (let key of keys) {
+    if (current[key] === undefined) {
+      return undefined;
+    }
+    current = current[key];
+  }
+  return current;
+}
+
+// 複数条件でフィルタリング
+function filterData(jsonInput) {
+  const filterGroups = document.querySelectorAll('.filter-group');
+  const filters = Array.from(filterGroups).map(group => ({
+    key: group.querySelector('.filterKey').value,
+    value: group.querySelector('.filterValue').value,
+    mode: group.querySelector('.searchMode').value
+  }));
   
-        filters.forEach(filter => {
-          const value = getValueByKey(item, filter.key);
-          if (value === undefined || value.toString() !== filter.value) {
-            matchesAllFilters = false;
-          }
-        });
-  
-        if (matchesAllFilters) {
-          const card = document.createElement('div');
-          card.className = 'bg-white p-4 shadow rounded relative';
-          card.innerHTML = `
-            <h2 class="text-xl font-bold mb-2">Item</h2>
-            <pre class="text-sm">${JSON.stringify(item, null, 2)}</pre>
-            <button class="copy-btn absolute top-2 right-2 p-1 bg-gray-200 text-gray-800 rounded">Copy</button>
-          `;
-          
-          // コピー機能
-          card.querySelector('.copy-btn').addEventListener('click', function() {
-            navigator.clipboard.writeText(JSON.stringify(item, null, 2));
-            alert('Copied to clipboard');
-          });
-  
-          output.appendChild(card);
+  const output = document.getElementById('output');
+  output.innerHTML = ''; // Clear previous results
+  filteredResults = []; // Reset the filtered results
+
+  try {
+    const jsonData = JSON.parse(jsonInput);
+
+    jsonData.forEach(item => {
+      let matchesAllFilters = true;
+
+      filters.forEach(filter => {
+        const value = getValueByKey(item, filter.key);
+        if (!checkMatch(value, filter.value, filter.mode)) {
+          matchesAllFilters = false;
         }
       });
-    } catch (error) {
-      alert('Invalid JSON input');
+
+      if (matchesAllFilters) {
+        filteredResults.push(item); // Add matching result to the array
+
+        const card = document.createElement('div');
+        card.className = 'bg-white p-4 shadow rounded relative';
+        card.innerHTML = `
+          <h2 class="text-xl font-bold mb-2">Item</h2>
+          <pre class="text-sm">${JSON.stringify(item, null, 2)}</pre>
+          <button class="copy-btn absolute top-2 right-2 p-1 bg-gray-200 text-gray-800 rounded">Copy</button>
+        `;
+        
+        // コピー機能
+        card.querySelector('.copy-btn').addEventListener('click', function() {
+          navigator.clipboard.writeText(JSON.stringify(item, null, 2));
+          alert('Copied to clipboard');
+        });
+
+        output.appendChild(card);
+      }
+    });
+
+    // フィルタリング結果がある場合、ダウンロードボタンを表示
+    const downloadButton = document.getElementById('downloadJsonBtn');
+    if (filteredResults.length > 0) {
+      downloadButton.classList.remove('hidden');
+    } else {
+      downloadButton.classList.add('hidden');
     }
+
+  } catch (error) {
+    alert('Invalid JSON input');
   }
-    </script>
+}
+
+// 検索モードに応じて一致を確認
+function checkMatch(itemValue, filterValue, mode) {
+  if (itemValue === undefined) return false;
+
+  itemValue = itemValue.toString();
+  filterValue = filterValue.toString();
+
+  switch (mode) {
+    case 'exact':
+      return itemValue === filterValue;
+    case 'contains':
+      return itemValue.includes(filterValue);
+    case 'startsWith':
+      return itemValue.startsWith(filterValue);
+    case 'endsWith':
+      return itemValue.endsWith(filterValue);
+    case 'caseInsensitive':
+      return itemValue.toLowerCase() === filterValue.toLowerCase();
+    case 'range':
+      const [min, max] = filterValue.split('-').map(Number);
+      const numValue = Number(itemValue);
+      return numValue >= min && numValue <= max;
+    case 'regex':
+      const regex = new RegExp(filterValue);
+      return regex.test(itemValue);
+    default:
+      return false;
+  }
+}
+
+// フィルタリング結果をJSONファイルとしてダウンロード
+function downloadJSON() {
+  const jsonString = JSON.stringify(filteredResults, null, 2);
+  const blob = new Blob([jsonString], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'filtered_results.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+  </script>
 </body>
 </html>
